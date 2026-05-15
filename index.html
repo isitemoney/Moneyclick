@@ -3,51 +3,339 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة التحكم | Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-    <!-- واجهة تسجيل الدخول -->
-    <div id="login-container" class="container">
-        <div class="logo">🔐</div>
-        <h2>تسجيل الدخول</h2>
-        <p>الرجاء إدخال البيانات التي استلمتها من المدير</p>
-        <input type="text" id="username" placeholder="اسم المستخدم">
-        <input type="password" id="password" placeholder="كلمة المرور">
-        <button onclick="login()">دخول إلى الحساب</button>
-        <p id="error-msg" class="error">خطأ في اسم المستخدم أو كلمة المرور!</p>
-    </div>
-
-    <!-- واجهة الداشبورد -->
-    <div id="dashboard-container" class="container dashboard" style="display: none;">
-        <div class="header">
-            <h3>أهلاً بك، <span id="user-display"></span> ✨</h3>
-            <button class="logout-btn" onclick="logout()">خروج</button>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="card">
-                <span class="icon">🖱️</span>
-                <h4>عدد الضغطات</h4>
-                <p id="clicks">0</p>
-            </div>
-            
-            <div class="card">
-                <span class="icon">💰</span>
-                <h4>الأرباح</h4>
-                <p id="earnings">$0.00</p>
-            </div>
-        </div>
-
-        <div class="user-info">
-            <p>حالة الحساب: <span style="color: #27ae60;">نشط</span></p>
-        </div>
-    </div>
-
-    <!-- مكتبات Firebase -->
+    <title>Eran money video</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="script.js"></script>
+    <style> 
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap'); 
+        body { font-family: 'Tajawal', sans-serif; } 
+        .hidden { display: none !important; } 
+        .stat-number { font-family: 'Tajawal', sans-serif !important; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-10">
+
+    <div id="redirect-screen" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center text-blue-400">
+        <div class="animate-spin rounded-full border-4 border-t-blue-500 border-slate-800 h-16 w-16 mb-6"></div>
+        <h2 class="text-2xl font-bold">جاري التحقق من الأمان...</h2>
+    </div>
+
+    <nav id="nav" class="hidden bg-slate-900/80 backdrop-blur-md p-4 border-b border-slate-800 flex justify-between items-center px-6 sticky top-0 z-50">
+        <div class="flex flex-col text-right">
+            <span class="text-lg font-bold text-blue-400">لوحة المروج</span>
+            <span id="user-welcome" class="text-[10px] text-slate-500 italic">جاري التحميل...</span>
+        </div>
+        <button onclick="logout()" class="bg-red-500/10 text-red-500 px-4 py-1 rounded-lg border border-red-500/30 text-xs font-bold">خروج</button>
+    </nav>
+
+    <div id="auth-section" class="hidden flex items-center justify-center min-h-screen p-4">
+        <div class="bg-slate-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-800">
+            <h2 id="auth-title" class="text-2xl font-bold text-center mb-6 text-blue-400">تسجيل الدخول</h2>
+            <div class="space-y-4 text-right">
+                <input type="text" id="username" placeholder="اسمك الكامل" class="hidden w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none focus:border-blue-500 transition text-sm">
+                <input type="email" id="email" placeholder="البريد الإلكتروني" class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none focus:border-blue-500 transition text-sm text-left">
+                <input type="password" id="password" placeholder="كلمة المرور" class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none focus:border-blue-500 transition text-sm text-left">
+                <button onclick="handleAuth()" class="w-full bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold transition">استمرار</button>
+                <button onclick="toggleAuthMode()" id="auth-switch" class="w-full text-slate-400 text-sm">ليس لديك حساب؟ سجل الآن</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-section" class="hidden p-4 max-w-6xl mx-auto space-y-6 mt-6">
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800"><p class="text-slate-400 text-[11px] mb-1">إجمالي الأرباح</p><h3 id="stat-total" class="stat-number text-2xl font-bold text-white">$0.00</h3></div>
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 border-b-blue-500/40"><p class="text-blue-400 text-[11px] mb-1 font-bold">أرباح اليوم</p><h3 id="stat-today" class="stat-number text-2xl font-bold text-blue-400">$0.00</h3></div>
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 border-b-emerald-500/40"><p class="text-emerald-400 text-[11px] mb-1 font-bold italic underline">قابل للسحب</p><h3 id="stat-withdrawable" class="stat-number text-2xl font-bold text-emerald-400">$0.00</h3></div>
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800"><p class="text-slate-400 text-[11px] mb-1">النقرات</p><h3 id="stat-clicks" class="stat-number text-2xl font-bold text-purple-400">0</h3></div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+            <h4 class="font-bold mb-3 text-sm text-slate-300">🔗 رابط التسويق الخاص بك</h4>
+            <div class="flex bg-slate-950 rounded-xl overflow-hidden border border-slate-800 p-1">
+                <input type="text" id="ref-link" readonly class="bg-transparent p-3 flex-1 text-[11px] outline-none text-blue-300 text-left">
+                <button onclick="copyRef()" class="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-xs font-bold transition">نسخ</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="openWithdraw()" class="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-bold transition shadow-lg text-white">💰 طلب سحب</button>
+            <a href="https://t.me/eruuiyl" target="_blank" class="bg-slate-800 p-4 rounded-xl font-bold border border-slate-700 text-center flex items-center justify-center">💬 الدعم الفني</a>
+        </div>
+
+        <div id="withdraw-modal" class="hidden bg-slate-900 p-6 rounded-2xl border border-emerald-500/30 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold text-emerald-400 text-center">طلب سحب الأرباح</h3>
+            <p class="text-[10px] text-center text-slate-500 italic">المراجعة خلال 24-72 ساعة | الحد الأدنى 7$</p>
+            <div class="space-y-3">
+                <select id="w-method" class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-sm">
+                    <option value="ZainCash">Zain Cash - زين كاش</option>
+                    <option value="USDT">USDT (TRC20)</option>
+                    <option value="AsiaCell">Asiacell - رصيد آسيا</option>
+                </select>
+                <input type="text" id="w-account" placeholder="رقم المحفظة أو العنوان" class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-sm text-right">
+                <input type="number" id="w-amount" placeholder="المبلغ (الحد الأدنى 7$)" class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-sm text-right">
+                <input type="text" id="w-contact" placeholder="يوزر تليجرام أو رقم للتواصل" class="w-full p-4 rounded-xl bg-slate-800 border border-emerald-500/40 outline-none text-sm text-right ring-1 ring-emerald-500/20">
+                <button onclick="confirmWithdraw()" class="w-full bg-emerald-600 py-4 rounded-xl font-bold hover:bg-emerald-700 transition">تأكيد طلب السحب</button>
+                <button onclick="openWithdraw()" class="w-full text-slate-500 text-sm">إلغاء</button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/50 p-5 rounded-2xl border border-slate-800">
+            <h4 class="text-sm font-bold mb-4 text-slate-400 border-r-4 border-blue-600 pr-2">📋 سجل عملياتك</h4>
+            <div id="user-withdraw-history" class="space-y-3 text-[11px]"></div>
+        </div>
+
+        <div id="admin-area" class="hidden space-y-8 mt-10 border-t border-slate-800 pt-10">
+            <div class="bg-red-900/10 border border-red-500/30 p-6 rounded-2xl text-right">
+                <h2 class="text-red-400 font-bold mb-4 italic">⚙️ طلبات السحب الجديدة</h2>
+                <div id="withdraw-list" class="space-y-4"></div>
+            </div>
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl text-right">
+                <h2 class="text-blue-400 font-bold mb-4 italic">👥 قائمة المروجين</h2>
+                <div id="admin-list" class="space-y-4 text-xs"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnkJf-6sAeRJpm34yXLmklLwSxM-GJvUc",
+            authDomain: "my-dash-c78e3.firebaseapp.com",
+            databaseURL: "https://my-dash-c78e3-default-rtdb.firebaseio.com",
+            projectId: "my-dash-c78e3",
+            storageBucket: "my-dash-c78e3.firebasestorage.app",
+            messagingSenderId: "137154835768",
+            appId: "1:137154835768:web:7f396782de1300f9bdfdcd"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+        
+        const ADMIN_EMAILS = ["xxetali46@gmail.com", "xxetali47@gmail.com"]; 
+        const DEFAULT_MARKETING_LINK = "https://hp.funroom.store/a/8nw6emt2";
+        let currentWithdrawable = 0;
+
+        // --- وظيفة السحب المحصنة ---
+        function confirmWithdraw() {
+            const amount = parseFloat(document.getElementById('w-amount').value);
+            const method = document.getElementById('w-method').value;
+            const account = document.getElementById('w-account').value;
+            const contact = document.getElementById('w-contact').value;
+            const user = auth.currentUser;
+
+            if (!user) return alert("خطأ في الجلسة.");
+            if (isNaN(amount) || amount < 7) return alert("الحد الأدنى للسحب هو 7$.");
+            if (amount > currentWithdrawable) return alert("رصيدك غير كافٍ.");
+            if (!account || !contact) return alert("يرجى إكمال البيانات.");
+
+            const userRef = db.ref('users/' + user.uid);
+            
+            userRef.transaction((userData) => {
+                if (userData) {
+                    const bal = parseFloat(userData.withdrawableBalance || 0);
+                    if (bal >= amount) {
+                        userData.withdrawableBalance = Number((bal - amount).toFixed(2));
+                        return userData;
+                    }
+                }
+                return; 
+            }, (error, committed) => {
+                if (committed) {
+                    db.ref('withdrawals').push({ 
+                        uid: user.uid, amount, method, account, contact, 
+                        timestamp: firebase.database.ServerValue.TIMESTAMP, 
+                        status: 'pending' 
+                    }).then(() => {
+                        alert(`✅ تم إرسال طلبك بنجاح!\nالمبلغ المخصوم: $${amount}\nالمراجعة: 24-72 ساعة.`);
+                        openWithdraw();
+                        document.getElementById('w-amount').value = "";
+                    });
+                } else {
+                    alert("❌ فشلت العملية، يرجى التحقق من الرصيد.");
+                }
+            });
+        }
+
+        async function checkRoute() {
+            const params = new URLSearchParams(window.location.search);
+            const promoterId = params.get('id');
+            if (promoterId) { 
+                document.getElementById('redirect-screen').classList.remove('hidden'); 
+                handleVisitor(promoterId); 
+            } else { 
+                initDashboard(); 
+            }
+        }
+
+        async function handleVisitor(id) {
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                const vIp = ipData.ip.replace(/\./g, '_'); 
+                const ipRef = db.ref('ip_logs/' + id + '/' + vIp);
+                const userRef = db.ref('users/' + id);
+                
+                const ipSnap = await ipRef.get();
+                const serverTimeSnap = await db.ref('.info/serverTimeOffset').get();
+                const now = Date.now() + (serverTimeSnap.val() || 0);
+                
+                if (ipSnap.exists() && (now - ipSnap.val() < 86400000)) {
+                    finalizeRedirect(userRef);
+                } else {
+                    await ipRef.set(now);
+                    await userRef.transaction(d => {
+                        if (d) {
+                            d.clicks = (d.clicks || 0) + 1;
+                            d.todayBalance = Number(((d.todayBalance || 0) + 0.02).toFixed(2));
+                            d.totalBalance = Number(((d.totalBalance || 0) + 0.02).toFixed(2));
+                        }
+                        return d;
+                    });
+                    finalizeRedirect(userRef);
+                }
+            } catch (e) { 
+                window.location.href = DEFAULT_MARKETING_LINK; 
+            }
+        }
+
+        async function finalizeRedirect(ref) {
+            const snap = await ref.get();
+            const link = (snap.val() && snap.val().marketingLink) ? snap.val().marketingLink : DEFAULT_MARKETING_LINK;
+            setTimeout(() => { window.location.href = link; }, 800);
+        }
+
+        function initDashboard() {
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    showUI('dashboard-section');
+                    processDailySettlement(user.uid);
+                    loadUserData(user);
+                    loadUserWithdrawHistory(user.uid);
+                    if (ADMIN_EMAILS.includes(user.email)) { 
+                        document.getElementById('admin-area').classList.remove('hidden'); 
+                        loadAdminData(); 
+                    }
+                } else { 
+                    showUI('auth-section'); 
+                }
+            });
+        }
+
+        function processDailySettlement(uid) {
+            const userRef = db.ref('users/' + uid);
+            userRef.once('value', snap => {
+                const d = snap.val(); if(!d) return;
+                const now = new Date();
+                const lastReset = d.lastResetDate || 0;
+                let settlementTime = new Date(); settlementTime.setHours(3, 0, 0, 0);
+                if (now.getTime() > settlementTime.getTime() && lastReset < settlementTime.getTime()) {
+                    userRef.update({ 
+                        withdrawableBalance: Number(((d.withdrawableBalance || 0) + (d.todayBalance || 0)).toFixed(2)), 
+                        todayBalance: 0, 
+                        lastResetDate: now.getTime() 
+                    });
+                }
+            });
+        }
+
+        function loadUserData(user) {
+            db.ref('users/' + user.uid).on('value', snap => {
+                const d = snap.val(); if(!d) return;
+                document.getElementById('stat-total').innerText = `$${(d.totalBalance || 0).toFixed(2)}`;
+                document.getElementById('stat-today').innerText = `$${(d.todayBalance || 0).toFixed(2)}`;
+                document.getElementById('stat-withdrawable').innerText = `$${(d.withdrawableBalance || 0).toFixed(2)}`;
+                document.getElementById('stat-clicks').innerText = d.clicks || 0;
+                document.getElementById('user-welcome').innerText = `أهلاً بك، ${d.username}`;
+                const path = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                document.getElementById('ref-link').value = path + "?id=" + user.uid;
+                currentWithdrawable = d.withdrawableBalance || 0;
+            });
+        }
+
+        function loadUserWithdrawHistory(uid) {
+            db.ref('withdrawals').orderByChild('uid').equalTo(uid).on('value', snap => {
+                const historyDiv = document.getElementById('user-withdraw-history');
+                const data = snap.val();
+                if(!data) { 
+                    historyDiv.innerHTML = "<p class='text-slate-600 italic text-center'>لا توجد طلبات سابقة.</p>"; 
+                    return; 
+                }
+                let html = "";
+                Object.keys(data).reverse().forEach(key => {
+                    const item = data[key];
+                    const statusText = item.status === 'paid' ? 'تم الدفع ✅' : 'قيد المراجعة ⏳';
+                    const statusClass = item.status === 'paid' ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10';
+                    html += `<div class="flex justify-between items-center bg-slate-950 p-3 rounded-xl border border-slate-800 mb-2"><div><p class="font-bold text-slate-200 text-sm">$${item.amount}</p><p class="text-[9px] text-slate-500">${item.method}</p></div><div class="px-3 py-1 rounded-full border border-slate-700/50 ${statusClass} font-bold text-[10px]">${statusText}</div></div>`;
+                });
+                historyDiv.innerHTML = html;
+            });
+        }
+
+        function loadAdminData() {
+            db.ref('users').on('value', snap => {
+                const users = snap.val(); const list = document.getElementById('admin-list'); list.innerHTML = "";
+                for (let id in users) {
+                    if (ADMIN_EMAILS.includes(users[id].email)) continue;
+                    list.innerHTML += `<div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center mb-2">
+                        <div class="text-right"><p class="text-blue-400 font-bold">${users[id].username}</p><p>رصيد: $${users[id].withdrawableBalance || 0}</p></div>
+                        <button onclick="db.ref('users/${id}').update({marketingLink: prompt('تحديث الرابط:', '${users[id].marketingLink}')})" class="bg-slate-800 px-3 py-1 rounded">تغيير الرابط</button>
+                    </div>`;
+                }
+            });
+
+            db.ref('withdrawals').on('value', snap => {
+                const list = document.getElementById('withdraw-list'); list.innerHTML = "";
+                const data = snap.val(); if(!data) return;
+                for (let id in data) {
+                    if(data[id].status === 'paid') continue;
+                    list.innerHTML += `<div class="bg-slate-950 p-4 rounded-xl border-r-4 border-amber-500 space-y-2 mb-3 shadow-lg text-right">
+                        <div class="flex justify-between items-center flex-row-reverse">
+                            <p class="font-bold text-white text-sm">$${data[id].amount} - ${data[id].method}</p>
+                            <button onclick="db.ref('withdrawals/${id}').update({status: 'paid'})" class="bg-emerald-600 px-4 py-1 rounded text-[10px] font-bold text-white">تم الدفع ✅</button>
+                        </div>
+                        <p class="text-slate-400 text-[10px]">المحفظة: <span class="text-white">${data[id].account}</span></p>
+                        <p class="text-blue-400 text-[10px] font-bold underline">تواصل: ${data[id].contact}</p>
+                    </div>`;
+                }
+            });
+        }
+
+        function showUI(id) {
+            document.querySelectorAll('#auth-section, #dashboard-section, #nav').forEach(el => el.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            if (id === 'dashboard-section') document.getElementById('nav').classList.remove('hidden');
+        }
+
+        let isLoginMode = true;
+        function toggleAuthMode() { 
+            isLoginMode = !isLoginMode; 
+            document.getElementById('username').classList.toggle('hidden', isLoginMode); 
+            document.getElementById('auth-title').innerText = isLoginMode ? "تسجيل الدخول" : "فتح حساب مروج"; 
+        }
+
+        async function handleAuth() { 
+            const email = document.getElementById('email').value; 
+            const pass = document.getElementById('password').value; 
+            try { 
+                if (isLoginMode) { 
+                    await auth.signInWithEmailAndPassword(email, pass); 
+                } else { 
+                    const name = document.getElementById('username').value; 
+                    const res = await auth.createUserWithEmailAndPassword(email, pass); 
+                    await db.ref('users/' + res.user.uid).set({ 
+                        username: name, email, totalBalance: 0, todayBalance: 0, withdrawableBalance: 0, clicks: 0, marketingLink: DEFAULT_MARKETING_LINK 
+                    }); 
+                } 
+            } catch (e) { alert(e.message); } 
+        }
+
+        function openWithdraw() { document.getElementById('withdraw-modal').classList.toggle('hidden'); }
+        function copyRef() { const el = document.getElementById('ref-link'); el.select(); document.execCommand('copy'); alert("✅ تم النسخ!"); }
+        function logout() { auth.signOut(); }
+
+        checkRoute();
+    </script>
 </body>
 </html>
